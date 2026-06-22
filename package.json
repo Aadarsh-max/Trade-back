@@ -15,15 +15,6 @@
     "test": "jest --runInBand",
     "test:watch": "jest --watch"
   },
-  "keywords": [
-    "trading",
-    "mern",
-    "stripe",
-    "razorpay",
-    "groq",
-    "ai",
-    "system-design"
-  ],
   "license": "ISC",
   "dependencies": {
     "@prisma/client": "^5.20.0",
