@@ -16,4 +16,44 @@ model User {
   isVerified   Boolean  @default(false)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  wallet Wallet?
+}
+
+model Wallet {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id])
+  balance   Decimal  @default(0) @db.Decimal(18, 2)
+  currency  String   @default("INR")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  transactions Transaction[]
+}
+
+enum TransactionType {
+  DEPOSIT
+  WITHDRAWAL
+  TRADE_DEBIT
+  TRADE_CREDIT
+}
+
+enum TransactionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+model Transaction {
+  id            String            @id @default(uuid())
+  walletId      String
+  wallet        Wallet            @relation(fields: [walletId], references: [id])
+  type          TransactionType
+  status        TransactionStatus @default(COMPLETED)
+  amount        Decimal           @db.Decimal(18, 2)
+  balanceAfter  Decimal           @db.Decimal(18, 2)
+  reference     String?
+  idempotencyKey String?          @unique
+  createdAt     DateTime          @default(now())
 }

@@ -11,6 +11,7 @@ import {
 } from "./middlewares/error.middleware.js";
 import healthRoutes from "./modules/health/health.routes.js";
 import authRoutes from './modules/auth/auth.routes.js';
+import walletRoutes from './modules/wallet/wallet.routes.js';
 
 const app = express();
 
@@ -28,6 +29,7 @@ app.use(cookieParser());
 app.use(morgan(env.NODE_ENV === "production" ? "combined" : "dev"));
 
 app.use('/api/auth', authRoutes);
+app.use('/api/wallet', walletRoutes);
 app.use("/api/health", healthRoutes);
 
 
