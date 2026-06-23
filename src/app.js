@@ -10,6 +10,7 @@ import {
   notFoundMiddleware,
 } from "./middlewares/error.middleware.js";
 import healthRoutes from "./modules/health/health.routes.js";
+import authRoutes from './modules/auth/auth.routes.js';
 
 const app = express();
 
@@ -26,7 +27,9 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(morgan(env.NODE_ENV === "production" ? "combined" : "dev"));
 
+app.use('/api/auth', authRoutes);
 app.use("/api/health", healthRoutes);
+
 
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);
