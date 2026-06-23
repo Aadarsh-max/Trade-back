@@ -12,6 +12,7 @@ import {
 import healthRoutes from "./modules/health/health.routes.js";
 import authRoutes from './modules/auth/auth.routes.js';
 import walletRoutes from './modules/wallet/wallet.routes.js';
+import paymentsRoutes from './modules/payments/payments.routes.js';
 
 const app = express();
 
@@ -30,6 +31,7 @@ app.use(morgan(env.NODE_ENV === "production" ? "combined" : "dev"));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/wallet', walletRoutes);
+app.use('/api/payments', paymentsRoutes);
 app.use("/api/health", healthRoutes);
 
 
