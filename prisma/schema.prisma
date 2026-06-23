@@ -30,6 +30,7 @@ model Wallet {
   updatedAt DateTime @updatedAt
 
   transactions Transaction[]
+  payments     Payment[]
 }
 
 enum TransactionType {
@@ -56,4 +57,33 @@ model Transaction {
   reference     String?
   idempotencyKey String?          @unique
   createdAt     DateTime          @default(now())
+}
+
+enum PaymentProvider {
+  STRIPE
+  RAZORPAY
+}
+
+enum PaymentStatus {
+  INITIATED
+  PENDING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+model Payment {
+  id                String          @id @default(uuid())
+  walletId          String
+  wallet            Wallet          @relation(fields: [walletId], references: [id])
+  provider          PaymentProvider
+  status            PaymentStatus   @default(INITIATED)
+  amount            Decimal         @db.Decimal(18, 2)
+  currency          String
+  providerPaymentId String          @unique
+  providerOrderId   String?         @unique
+  idempotencyKey    String          @unique
+  metadata          Json?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
 }
