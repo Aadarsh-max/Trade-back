@@ -1,17 +1,14 @@
-import bcrypt from "bcryptjs";
-import prisma from "../../config/db.config.js";
-import { ApiError } from "../../utils/apiError.js";
-import {
-  generateAccessToken,
-  generateRefreshToken,
-  verifyRefreshToken,
-} from "../../utils/jwt.js";
+import bcrypt from 'bcryptjs';
+import prisma from '../../config/db.config.js';
+import { ApiError } from '../../utils/apiError.js';
+import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from '../../utils/jwt.js';
+import { enqueueEmail } from '../../jobs/email.job.js';
 
 export const signupUser = async ({ fullName, email, password }) => {
   const existingUser = await prisma.user.findUnique({ where: { email } });
 
   if (existingUser) {
-    throw new ApiError(409, "User with this email already exists");
+    throw new ApiError(409, 'User with this email already exists');
   }
 
   const hashedPassword = await bcrypt.hash(password, 10);
@@ -32,6 +29,12 @@ export const signupUser = async ({ fullName, email, password }) => {
     data: { refreshToken },
   });
 
+  await enqueueEmail({
+    to: user.email,
+    subject: 'Welcome to the Trading App',
+    body: `Hi ${user.fullName}, your account has been created successfully.`,
+  });
+
   return {
     user: {
       id: user.id,
@@ -47,13 +50,13 @@ export const loginUser = async ({ email, password }) => {
   const user = await prisma.user.findUnique({ where: { email } });
 
   if (!user) {
-    throw new ApiError(401, "Invalid email or password");
+    throw new ApiError(401, 'Invalid email or password');
   }
 
   const isPasswordValid = await bcrypt.compare(password, user.password);
 
   if (!isPasswordValid) {
-    throw new ApiError(401, "Invalid email or password");
+    throw new ApiError(401, 'Invalid email or password');
   }
 
   const accessToken = generateAccessToken({ userId: user.id });
@@ -77,20 +80,20 @@ export const loginUser = async ({ email, password }) => {
 
 export const refreshUserAccessToken = async (token) => {
   if (!token) {
-    throw new ApiError(401, "Refresh token missing");
+    throw new ApiError(401, 'Refresh token missing');
   }
 
   let decoded;
   try {
     decoded = verifyRefreshToken(token);
   } catch (err) {
-    throw new ApiError(401, "Invalid or expired refresh token");
+    throw new ApiError(401, 'Invalid or expired refresh token');
   }
 
   const user = await prisma.user.findUnique({ where: { id: decoded.userId } });
 
   if (!user || user.refreshToken !== token) {
-    throw new ApiError(401, "Refresh token does not match");
+    throw new ApiError(401, 'Refresh token does not match');
   }
 
   const newAccessToken = generateAccessToken({ userId: user.id });
