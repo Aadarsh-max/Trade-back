@@ -1,4 +1,5 @@
 import { ApiError } from '../utils/apiError.js';
+import logger from '../utils/logger.js';
 
 export const errorMiddleware = (err, req, res, next) => {
   let statusCode = err.statusCode || 500;
@@ -7,6 +8,16 @@ export const errorMiddleware = (err, req, res, next) => {
   if (!(err instanceof ApiError)) {
     statusCode = 500;
     message = 'Internal server error';
+
+    logger.log({
+      level: 'error',
+      message: err.message,
+      meta: {
+        stack: err.stack,
+        path: req.originalUrl,
+        method: req.method,
+      },
+    });
   }
 
   res.status(statusCode).json({

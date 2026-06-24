@@ -17,6 +17,7 @@ import marketRoutes from './modules/market-data/market.routes.js';
 import orderRoutes from './modules/orders/order.routes.js';
 import portfolioRoutes from './modules/portfolio/portfolio.routes.js';
 import aiRoutes from './modules/ai/ai.routes.js';
+import { globalLimiter } from './middlewares/rateLimiter.middleware.js';
 
 const app = express();
 
@@ -32,6 +33,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(morgan(env.NODE_ENV === "production" ? "combined" : "dev"));
+
+app.use(globalLimiter);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/wallet', walletRoutes);
