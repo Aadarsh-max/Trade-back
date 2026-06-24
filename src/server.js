@@ -4,6 +4,7 @@ import { connectPostgres } from './config/db.config.js';
 import { connectMongo } from './config/mongo.config.js';
 import redisClient from './config/redis.config.js';
 import { startPricePolling } from './jobs/price-poll.job.js';
+import { startOrderExecutionPolling } from './jobs/order-execution.job.js';
 
 const startServer = async () => {
   try {
@@ -17,6 +18,7 @@ const startServer = async () => {
     console.log('Redis connected');
 
     startPricePolling();
+    startOrderExecutionPolling();
 
     app.listen(env.PORT, () => {
       console.log(`Server running on port ${env.PORT} in ${env.NODE_ENV} mode`);
