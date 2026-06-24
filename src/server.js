@@ -7,6 +7,7 @@ import redisClient from './config/redis.config.js';
 import { startPricePolling } from './jobs/price-poll.job.js';
 import { startOrderExecutionPolling } from './jobs/order-execution.job.js';
 import { initSocketServer } from './sockets/socket.server.js';
+import { startDailySummaryJob } from './jobs/ai-summary.job.js';
 
 const startServer = async () => {
   try {
@@ -26,6 +27,7 @@ const startServer = async () => {
 
     startPricePolling();
     startOrderExecutionPolling();
+    startDailySummaryJob();
 
     httpServer.listen(env.PORT, () => {
       console.log(`Server running on port ${env.PORT} in ${env.NODE_ENV} mode`);
