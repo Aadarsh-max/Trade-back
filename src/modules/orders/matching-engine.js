@@ -1,5 +1,6 @@
 import prisma from '../../config/db.config.js';
 import { ApiError } from '../../utils/apiError.js';
+import { notifyOrderFilled, notifyOrderRejected } from '../../sockets/order.socket.js';
 
 export const executeTrade = async (orderId, executionPrice) => {
   return prisma.$transaction(async (tx) => {
@@ -27,6 +28,7 @@ export const executeTrade = async (orderId, executionPrice) => {
     if (order.side === 'BUY') {
       if (currentBalance < total) {
         await tx.order.update({ where: { id: order.id }, data: { status: 'REJECTED' } });
+        notifyOrderRejected(order.userId, { orderId: order.id, reason: 'Insufficient balance' });
         throw new ApiError(400, 'Insufficient balance for this order');
       }
 
@@ -79,6 +81,7 @@ export const executeTrade = async (orderId, executionPrice) => {
 
       if (!existingHolding || Number(existingHolding.quantity) < quantity) {
         await tx.order.update({ where: { id: order.id }, data: { status: 'REJECTED' } });
+        notifyOrderRejected(order.userId, { orderId: order.id, reason: 'Insufficient holdings' });
         throw new ApiError(400, 'Insufficient holdings for this sell order');
       }
 
@@ -131,6 +134,8 @@ export const executeTrade = async (orderId, executionPrice) => {
         total,
       },
     });
+
+    notifyOrderFilled(order.userId, { order: updatedOrder, trade });
 
     return { order: updatedOrder, trade };
   });

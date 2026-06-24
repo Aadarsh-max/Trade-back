@@ -1,6 +1,7 @@
 import cron from 'node-cron';
 import { fetchQuoteFromProvider } from '../modules/market-data/market.service.js';
 import { setCachedQuote } from '../modules/market-data/market.cache.js';
+import { broadcastPriceUpdate } from '../sockets/price.socket.js';
 
 const TRACKED_SYMBOLS = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT'];
 
@@ -9,6 +10,7 @@ const pollPrices = async () => {
     try {
       const quote = await fetchQuoteFromProvider(symbol);
       await setCachedQuote(symbol, quote);
+      broadcastPriceUpdate(symbol, quote);
     } catch (err) {
       console.error(`Failed to poll price for ${symbol}`, err.message);
     }
