@@ -1,9 +1,8 @@
 import axios from 'axios';
-import redisClient from '../../config/redis.config.js';
 import { ApiError } from '../../utils/apiError.js';
+import { getCachedQuote, setCachedQuote, getCachedCandles, setCachedCandles } from './market.cache.js';
 
 const BINANCE_BASE_URL = 'https://api.binance.com/api/v3';
-const CACHE_TTL_SECONDS = 5;
 
 export const fetchQuoteFromProvider = async (symbol) => {
   try {
@@ -22,17 +21,15 @@ export const fetchQuoteFromProvider = async (symbol) => {
 };
 
 export const getQuote = async (symbol) => {
-  const cacheKey = `quote:${symbol.toUpperCase()}`;
-
-  const cached = await redisClient.get(cacheKey);
+  const cached = await getCachedQuote(symbol);
 
   if (cached) {
-    return JSON.parse(cached);
+    return cached;
   }
 
   const quote = await fetchQuoteFromProvider(symbol);
 
-  await redisClient.set(cacheKey, JSON.stringify(quote), 'EX', CACHE_TTL_SECONDS);
+  await setCachedQuote(symbol, quote);
 
   return quote;
 };
@@ -62,18 +59,15 @@ export const fetchCandlesFromProvider = async (symbol, interval, limit) => {
 };
 
 export const getCandles = async (symbol, interval = '1h', limit = 100) => {
-  const cacheKey = `candles:${symbol.toUpperCase()}:${interval}:${limit}`;
-  const cacheTtl = 30;
-
-  const cached = await redisClient.get(cacheKey);
+  const cached = await getCachedCandles(symbol, interval, limit);
 
   if (cached) {
-    return JSON.parse(cached);
+    return cached;
   }
 
   const candles = await fetchCandlesFromProvider(symbol, interval, limit);
 
-  await redisClient.set(cacheKey, JSON.stringify(candles), 'EX', cacheTtl);
+  await setCachedCandles(symbol, interval, limit, candles);
 
   return candles;
 };
