@@ -15,6 +15,7 @@ import walletRoutes from './modules/wallet/wallet.routes.js';
 import paymentsRoutes from './modules/payments/payments.routes.js';
 import marketRoutes from './modules/market-data/market.routes.js';
 import orderRoutes from './modules/orders/order.routes.js';
+import portfolioRoutes from './modules/portfolio/portfolio.routes.js';
 
 const app = express();
 
@@ -36,6 +37,7 @@ app.use('/api/wallet', walletRoutes);
 app.use('/api/payments', paymentsRoutes);
 app.use('/api/market', marketRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/portfolio', portfolioRoutes);
 app.use("/api/health", healthRoutes);
 
 
