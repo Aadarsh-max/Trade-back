@@ -17,6 +17,7 @@ import marketRoutes from './modules/market-data/market.routes.js';
 import orderRoutes from './modules/orders/order.routes.js';
 import portfolioRoutes from './modules/portfolio/portfolio.routes.js';
 import aiRoutes from './modules/ai/ai.routes.js';
+import notificationRoutes from './modules/notifications/notification.routes.js';
 import { globalLimiter } from './middlewares/rateLimiter.middleware.js';
 
 const app = express();
@@ -43,6 +44,7 @@ app.use('/api/market', marketRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/portfolio', portfolioRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/notifications', notificationRoutes);
 app.use("/api/health", healthRoutes);
 
 

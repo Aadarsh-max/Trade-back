@@ -1,5 +1,6 @@
 import prisma from '../../config/db.config.js';
 import { ApiError } from '../../utils/apiError.js';
+import { createNotification } from '../notifications/notification.service.js';
 
 export const getOrCreateWallet = async (userId) => {
   let wallet = await prisma.wallet.findUnique({ where: { userId } });
@@ -55,6 +56,13 @@ export const depositToWallet = async (userId, amount, idempotencyKey) => {
     return { wallet: updatedWallet, transaction };
   });
 
+  await createNotification({
+    userId,
+    type: 'DEPOSIT',
+    title: 'Deposit successful',
+    message: `₹${amount.toLocaleString()} was added to your wallet`,
+  });
+
   return { duplicate: false, ...result };
 };
 
@@ -99,6 +107,13 @@ export const withdrawFromWallet = async (userId, amount, idempotencyKey) => {
     });
 
     return { wallet: updatedWallet, transaction };
+  });
+
+  await createNotification({
+    userId,
+    type: 'WITHDRAWAL',
+    title: 'Withdrawal successful',
+    message: `₹${amount.toLocaleString()} was withdrawn from your wallet`,
   });
 
   return { duplicate: false, ...result };
