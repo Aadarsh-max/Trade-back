@@ -9,8 +9,9 @@ import {
 import { env } from '../../config/env.js';
 
 const FINNHUB_BASE_URL = 'https://finnhub.io/api/v1';
+const COINBASE_BASE_URL = 'https://api.exchange.coinbase.com';
 
-const SYMBOL_MAP = {
+const FINNHUB_SYMBOL_MAP = {
   BTCUSDT: 'BINANCE:BTCUSDT',
   ETHUSDT: 'BINANCE:ETHUSDT',
   SOLUSDT: 'BINANCE:SOLUSDT',
@@ -23,17 +24,34 @@ const SYMBOL_MAP = {
   LINKUSDT: 'BINANCE:LINKUSDT',
 };
 
-const toFinnhubSymbol = (symbol) => {
-  return SYMBOL_MAP[symbol.toUpperCase()] || `BINANCE:${symbol.toUpperCase()}`;
+const COINBASE_PRODUCT_MAP = {
+  BTCUSDT: 'BTC-USD',
+  ETHUSDT: 'ETH-USD',
+  SOLUSDT: 'SOL-USD',
+  BNBUSDT: 'BNB-USD',
+  XRPUSDT: 'XRP-USD',
+  ADAUSDT: 'ADA-USD',
+  DOGEUSDT: 'DOGE-USD',
+  MATICUSDT: 'MATIC-USD',
+  DOTUSDT: 'DOT-USD',
+  LINKUSDT: 'LINK-USD',
 };
 
-const intervalToResolution = {
-  '1m': '1',
-  '5m': '5',
-  '15m': '15',
-  '1h': '60',
-  '4h': '240',
-  '1d': 'D',
+const toFinnhubSymbol = (symbol) => {
+  return FINNHUB_SYMBOL_MAP[symbol.toUpperCase()] || `BINANCE:${symbol.toUpperCase()}`;
+};
+
+const toCoinbaseProduct = (symbol) => {
+  return COINBASE_PRODUCT_MAP[symbol.toUpperCase()] || `${symbol.replace('USDT', '')}-USD`;
+};
+
+const intervalToGranularity = {
+  '1m': 60,
+  '5m': 300,
+  '15m': 900,
+  '1h': 3600,
+  '4h': 14400,
+  '1d': 86400,
 };
 
 export const fetchQuoteFromProvider = async (symbol) => {
@@ -74,44 +92,46 @@ export const getQuote = async (symbol) => {
 };
 
 export const fetchCandlesFromProvider = async (symbol, interval, limit) => {
-  const finnhubSymbol = toFinnhubSymbol(symbol);
-  const resolution = intervalToResolution[interval] || '60';
+  const product = toCoinbaseProduct(symbol);
+  const granularity = intervalToGranularity[interval] || 3600;
 
-  const now = Math.floor(Date.now() / 1000);
-  const secondsPerCandle = {
-    '1': 60, '5': 300, '15': 900,
-    '60': 3600, '240': 14400, 'D': 86400,
-  };
-  const from = now - (secondsPerCandle[resolution] || 3600) * limit;
+  const end = new Date();
+  const start = new Date(end.getTime() - granularity * limit * 1000);
 
   try {
-    const response = await axios.get(`${FINNHUB_BASE_URL}/crypto/candle`, {
-      params: {
-        symbol: finnhubSymbol,
-        resolution,
-        from,
-        to: now,
-        token: env.MARKET_DATA_API_KEY,
-      },
-      timeout: 15000,
-    });
+    const response = await axios.get(
+      `${COINBASE_BASE_URL}/products/${product}/candles`,
+      {
+        params: {
+          granularity,
+          start: start.toISOString(),
+          end: end.toISOString(),
+        },
+        headers: {
+          'User-Agent': 'TradeflowApp/1.0',
+        },
+        timeout: 15000,
+      }
+    );
 
-    if (response.data.s === 'no_data' || !response.data.t) {
+    if (!response.data || !Array.isArray(response.data) || response.data.length === 0) {
       throw new ApiError(502, `No candle data for ${symbol}`);
     }
 
-    return response.data.t.map((time, i) => ({
-      openTime: time * 1000,
-      open: response.data.o[i],
-      high: response.data.h[i],
-      low: response.data.l[i],
-      close: response.data.c[i],
-      volume: response.data.v[i] || 0,
-      closeTime: time * 1000 + (secondsPerCandle[resolution] || 3600) * 1000,
-    }));
+    return response.data
+      .map((candle) => ({
+        openTime: candle[0] * 1000,
+        open: candle[3],
+        high: candle[2],
+        low: candle[1],
+        close: candle[4],
+        volume: candle[5] || 0,
+        closeTime: candle[0] * 1000 + granularity * 1000,
+      }))
+      .sort((a, b) => a.openTime - b.openTime);
   } catch (err) {
     if (err instanceof ApiError) throw err;
-    throw new ApiError(502, `Failed to fetch candles for ${symbol}`);
+    throw new ApiError(502, `Failed to fetch candles for ${symbol}: ${err.message}`);
   }
 };
 
