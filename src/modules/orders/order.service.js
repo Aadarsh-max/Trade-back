@@ -2,6 +2,7 @@ import prisma from '../../config/db.config.js';
 import { ApiError } from '../../utils/apiError.js';
 import { getQuote } from '../market-data/market.service.js';
 import { executeTrade } from './matching-engine.js';
+import { usdToInr } from '../../utils/currency.js';
 
 export const placeOrder = async (userId, { symbol, side, type, quantity, limitPrice }) => {
   const wallet = await prisma.wallet.findUnique({ where: { userId } });
@@ -12,9 +13,11 @@ export const placeOrder = async (userId, { symbol, side, type, quantity, limitPr
 
   if (side === 'BUY') {
     const quote = await getQuote(symbol);
-    const estimatedCost = quantity * (type === 'LIMIT' ? limitPrice : quote.price);
+    const priceUsd = type === 'LIMIT' ? limitPrice : quote.price;
+    const priceInr = await usdToInr(priceUsd);
+    const estimatedCostInr = quantity * priceInr;
 
-    if (Number(wallet.balance) < estimatedCost) {
+    if (Number(wallet.balance) < estimatedCostInr) {
       throw new ApiError(400, 'Insufficient balance to place this order');
     }
   } else {

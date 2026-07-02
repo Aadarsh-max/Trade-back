@@ -131,3 +131,61 @@ export const handleRazorpayPaymentSuccess = async (
 
   return { alreadyProcessed: false, ...result };
 };
+
+export const verifyAndCreditRazorpayPayment = async (paymentId, orderId, signature, userId) => {
+  verifyRazorpaySignature(orderId, paymentId, signature, env.RAZORPAY_KEY_SECRET);
+
+  const payment = await prisma.payment.findUnique({
+    where: { providerOrderId: orderId },
+  });
+
+  if (!payment) {
+    throw new ApiError(404, 'Payment record not found');
+  }
+
+  if (payment.status === 'COMPLETED') {
+    return { alreadyProcessed: true };
+  }
+
+  const amount = Number(payment.amount);
+  const walletId = payment.walletId;
+
+  const result = await prisma.$transaction(async (tx) => {
+    const wallet = await tx.wallet.findUnique({ where: { id: walletId } });
+
+    if (!wallet) {
+      throw new ApiError(404, 'Wallet not found');
+    }
+
+    const newBalance = Number(wallet.balance) + amount;
+
+    const updatedWallet = await tx.wallet.update({
+      where: { id: walletId },
+      data: { balance: newBalance },
+    });
+
+    const transaction = await tx.transaction.create({
+      data: {
+        walletId,
+        type: 'DEPOSIT',
+        status: 'COMPLETED',
+        amount,
+        balanceAfter: newBalance,
+        reference: paymentId,
+        idempotencyKey: payment.idempotencyKey,
+      },
+    });
+
+    await tx.payment.update({
+      where: { id: payment.id },
+      data: {
+        status: 'COMPLETED',
+        providerPaymentId: paymentId,
+      },
+    });
+
+    return { wallet: updatedWallet, transaction };
+  });
+
+  return { alreadyProcessed: false, ...result };
+};

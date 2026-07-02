@@ -1,5 +1,6 @@
 import prisma from '../../config/db.config.js';
 import { getMultipleQuotes } from '../market-data/market.service.js';
+import { usdToInr, getUsdToInrRate } from '../../utils/currency.js';
 
 export const getUserHoldings = async (userId) => {
   const holdings = await prisma.holding.findMany({
@@ -12,24 +13,28 @@ export const getUserHoldings = async (userId) => {
 
   const symbols = holdings.map((h) => h.symbol);
   const quotes = await getMultipleQuotes(symbols);
+  const rate = await getUsdToInrRate();
 
   const quoteMap = new Map(quotes.map((q) => [q.symbol, q.price]));
 
   return holdings.map((holding) => {
     const quantity = Number(holding.quantity);
     const avgBuyPrice = Number(holding.avgBuyPrice);
-    const currentPrice = quoteMap.get(holding.symbol) || avgBuyPrice;
+    const currentPriceUsd = quoteMap.get(holding.symbol) || 0;
+    const currentPriceInr = parseFloat((currentPriceUsd * rate).toFixed(2));
 
     const investedValue = quantity * avgBuyPrice;
-    const currentValue = quantity * currentPrice;
+    const currentValue = quantity * currentPriceInr;
     const unrealizedPnl = currentValue - investedValue;
-    const unrealizedPnlPercent = investedValue > 0 ? (unrealizedPnl / investedValue) * 100 : 0;
+    const unrealizedPnlPercent =
+      investedValue > 0 ? (unrealizedPnl / investedValue) * 100 : 0;
 
     return {
       symbol: holding.symbol,
       quantity,
       avgBuyPrice,
-      currentPrice,
+      currentPriceUsd,
+      currentPriceInr,
       investedValue,
       currentValue,
       unrealizedPnl,

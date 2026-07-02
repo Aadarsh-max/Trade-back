@@ -1,56 +1,58 @@
-import prisma from "../../config/db.config.js";
-import { ApiError } from "../../utils/apiError.js";
+import prisma from '../../config/db.config.js';
+import { ApiError } from '../../utils/apiError.js';
 import {
   notifyOrderFilled,
   notifyOrderRejected,
-} from "../../sockets/order.socket.js";
-import { createNotification } from "../notifications/notification.service.js";
+} from '../../sockets/order.socket.js';
+import { createNotification } from '../notifications/notification.service.js';
+import { usdToInr } from '../../utils/currency.js';
 
-export const executeTrade = async (orderId, executionPrice) => {
+export const executeTrade = async (orderId, executionPriceUsd) => {
   return prisma.$transaction(async (tx) => {
     const order = await tx.order.findUnique({ where: { id: orderId } });
 
     if (!order) {
-      throw new ApiError(404, "Order not found");
+      throw new ApiError(404, 'Order not found');
     }
 
-    if (order.status !== "PENDING") {
-      throw new ApiError(400, "Order is not pending");
+    if (order.status !== 'PENDING') {
+      throw new ApiError(400, 'Order is not pending');
     }
 
     const quantity = Number(order.quantity);
-    const total = quantity * executionPrice;
+    const executionPriceInr = await usdToInr(executionPriceUsd);
+    const totalInr = quantity * executionPriceInr;
 
     const wallet = await tx.wallet.findUnique({
       where: { userId: order.userId },
     });
 
     if (!wallet) {
-      throw new ApiError(404, "Wallet not found");
+      throw new ApiError(404, 'Wallet not found');
     }
 
     const currentBalance = Number(wallet.balance);
 
-    if (order.side === "BUY") {
-      if (currentBalance < total) {
+    if (order.side === 'BUY') {
+      if (currentBalance < totalInr) {
         await tx.order.update({
           where: { id: order.id },
-          data: { status: "REJECTED" },
+          data: { status: 'REJECTED' },
         });
         notifyOrderRejected(order.userId, {
           orderId: order.id,
-          reason: "Insufficient balance",
+          reason: 'Insufficient balance',
         });
         await createNotification({
           userId: order.userId,
-          type: "ORDER_REJECTED",
-          title: "Order rejected",
+          type: 'ORDER_REJECTED',
+          title: 'Order rejected',
           message: `Insufficient balance to place this ${order.side} order for ${order.symbol}`,
         });
-        throw new ApiError(400, "Insufficient balance for this order");
+        throw new ApiError(400, 'Insufficient balance for this order');
       }
 
-      const newBalance = currentBalance - total;
+      const newBalance = currentBalance - totalInr;
 
       await tx.wallet.update({
         where: { id: wallet.id },
@@ -60,9 +62,9 @@ export const executeTrade = async (orderId, executionPrice) => {
       await tx.transaction.create({
         data: {
           walletId: wallet.id,
-          type: "TRADE_DEBIT",
-          status: "COMPLETED",
-          amount: total,
+          type: 'TRADE_DEBIT',
+          status: 'COMPLETED',
+          amount: totalInr,
           balanceAfter: newBalance,
           reference: order.id,
         },
@@ -79,7 +81,7 @@ export const executeTrade = async (orderId, executionPrice) => {
         const oldAvgPrice = Number(existingHolding.avgBuyPrice);
         const newQty = oldQty + quantity;
         const newAvgPrice =
-          (oldQty * oldAvgPrice + quantity * executionPrice) / newQty;
+          (oldQty * oldAvgPrice + quantity * executionPriceInr) / newQty;
 
         await tx.holding.update({
           where: { id: existingHolding.id },
@@ -91,7 +93,7 @@ export const executeTrade = async (orderId, executionPrice) => {
             userId: order.userId,
             symbol: order.symbol,
             quantity,
-            avgBuyPrice: executionPrice,
+            avgBuyPrice: executionPriceInr,
           },
         });
       }
@@ -105,19 +107,19 @@ export const executeTrade = async (orderId, executionPrice) => {
       if (!existingHolding || Number(existingHolding.quantity) < quantity) {
         await tx.order.update({
           where: { id: order.id },
-          data: { status: "REJECTED" },
+          data: { status: 'REJECTED' },
         });
         notifyOrderRejected(order.userId, {
           orderId: order.id,
-          reason: "Insufficient holdings",
+          reason: 'Insufficient holdings',
         });
         await createNotification({
           userId: order.userId,
-          type: "ORDER_REJECTED",
-          title: "Order rejected",
+          type: 'ORDER_REJECTED',
+          title: 'Order rejected',
           message: `Insufficient holdings to place this sell order for ${order.symbol}`,
         });
-        throw new ApiError(400, "Insufficient holdings for this sell order");
+        throw new ApiError(400, 'Insufficient holdings for this sell order');
       }
 
       const newQty = Number(existingHolding.quantity) - quantity;
@@ -131,7 +133,7 @@ export const executeTrade = async (orderId, executionPrice) => {
         });
       }
 
-      const newBalance = currentBalance + total;
+      const newBalance = currentBalance + totalInr;
 
       await tx.wallet.update({
         where: { id: wallet.id },
@@ -141,9 +143,9 @@ export const executeTrade = async (orderId, executionPrice) => {
       await tx.transaction.create({
         data: {
           walletId: wallet.id,
-          type: "TRADE_CREDIT",
-          status: "COMPLETED",
-          amount: total,
+          type: 'TRADE_CREDIT',
+          status: 'COMPLETED',
+          amount: totalInr,
           balanceAfter: newBalance,
           reference: order.id,
         },
@@ -153,8 +155,8 @@ export const executeTrade = async (orderId, executionPrice) => {
     const updatedOrder = await tx.order.update({
       where: { id: order.id },
       data: {
-        status: "FILLED",
-        filledPrice: executionPrice,
+        status: 'FILLED',
+        filledPrice: executionPriceInr,
         filledAt: new Date(),
       },
     });
@@ -165,8 +167,8 @@ export const executeTrade = async (orderId, executionPrice) => {
         symbol: order.symbol,
         side: order.side,
         quantity,
-        price: executionPrice,
-        total,
+        price: executionPriceInr,
+        total: totalInr,
       },
     });
 
@@ -174,9 +176,9 @@ export const executeTrade = async (orderId, executionPrice) => {
 
     await createNotification({
       userId: order.userId,
-      type: "ORDER_FILLED",
-      title: "Order filled",
-      message: `${order.side} ${quantity} ${order.symbol} at $${executionPrice.toLocaleString()}`,
+      type: 'ORDER_FILLED',
+      title: 'Order filled',
+      message: `${order.side} ${quantity} ${order.symbol} at ₹${executionPriceInr.toLocaleString()} ($${executionPriceUsd.toLocaleString()} USD)`,
     });
 
     return { order: updatedOrder, trade };
@@ -186,7 +188,7 @@ export const executeTrade = async (orderId, executionPrice) => {
 export const checkLimitOrderMatch = (order, currentPrice) => {
   const limitPrice = Number(order.limitPrice);
 
-  if (order.side === "BUY") {
+  if (order.side === 'BUY') {
     return currentPrice <= limitPrice;
   }
 
