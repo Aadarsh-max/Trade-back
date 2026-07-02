@@ -1,26 +1,25 @@
 import cron from 'node-cron';
-import { fetchQuoteFromProvider } from '../modules/market-data/market.service.js';
+import { getMultipleQuotes } from '../modules/market-data/market.service.js';
 import { setCachedQuote } from '../modules/market-data/market.cache.js';
 import { broadcastPriceUpdate } from '../sockets/price.socket.js';
 
 const TRACKED_SYMBOLS = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT'];
 
-let symbolIndex = 0;
-
-const pollNextPrice = async () => {
-  const symbol = TRACKED_SYMBOLS[symbolIndex % TRACKED_SYMBOLS.length];
-  symbolIndex++;
-
+const pollPrices = async () => {
   try {
-    const quote = await fetchQuoteFromProvider(symbol);
-    await setCachedQuote(symbol, quote);
-    broadcastPriceUpdate(symbol, quote);
+    const quotes = await getMultipleQuotes(TRACKED_SYMBOLS);
+    for (const quote of quotes) {
+      if (quote.price > 0) {
+        await setCachedQuote(quote.symbol, quote);
+        broadcastPriceUpdate(quote.symbol, quote);
+      }
+    }
   } catch (err) {
-    console.error(`Failed to poll price for ${symbol}`, err.message);
+    console.error('Price polling failed:', err.message);
   }
 };
 
 export const startPricePolling = () => {
-  cron.schedule('*/12 * * * * *', pollNextPrice);
-  console.log('Price polling started (Twelve Data), tracking', TRACKED_SYMBOLS.join(', '));
+  cron.schedule('*/30 * * * * *', pollPrices);
+  console.log('Price polling started (Finnhub), tracking', TRACKED_SYMBOLS.join(', '));
 };
