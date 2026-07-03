@@ -17,18 +17,18 @@ const buildLimiter = ({ windowMs, max, message }) => {
 
 export const globalLimiter = buildLimiter({
   windowMs: 60 * 1000,
-  max: 100,
+  max: 500,
   message: 'Too many requests, please slow down',
 });
 
 export const authLimiter = buildLimiter({
   windowMs: 15 * 60 * 1000,
-  max: 10,
+  max: 50,
   message: 'Too many auth attempts, please try again later',
 });
 
 export const orderLimiter = buildLimiter({
   windowMs: 60 * 1000,
-  max: 20,
+  max: 50,
   message: 'Too many order requests, please slow down',
 });
